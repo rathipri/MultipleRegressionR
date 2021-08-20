@@ -1,0 +1,82 @@
+#install packages for cleaning and plotting data 
+install.packages("tidyverse")
+install.packages("openxlsx")
+install.packages("plotly")
+install.packages("zoo")
+install.packages("psych")
+
+#access installed packages for data preparation and analysis
+library(tidyverse)
+library(openxlsx)
+library(plotly)
+library(zoo)
+library(psych)
+library(plyr)
+library(e1071)
+library(olsrr)
+library(caret)
+
+#load data from CSV file - patient medical data extracted from hospital database
+medData <- read.csv("/Users/rathipriyankasrinivasan/Desktop/WGU/Term 2/Predictive Modeling/Medical Data/medical_clean.csv")
+
+#remove missing values and nulls
+complete.cases(medData)
+#review which columns have null values - no NA/null values 
+summary(medData)
+
+#create subset of columns relevant to research question - includes medical conditions and readmissions
+tcharge <- subset(medData, select = -c(1:15, 20:40, 42:50))
+
+#change all column names to lowercase
+names(tcharge) <- tolower(names(tcharge))
+
+#convert marital status to 0 if not married, if married convert to 1; then change character type to integer
+tcharge$marital[tcharge$marital == "Separated"| tcharge$marital == "Divorced"| tcharge$marital=="Never Married"| tcharge$marital =="Widowed" ] <-0
+tcharge$marital[tcharge$marital == "Married"] <- 1
+tcharge$marital <- as.integer(tcharge$marital)
+
+#convert gender to 0 if female, if male convert to 1, if nonbinary convert to 2; then change character type to integer
+tcharge$gender[tcharge$gender == "Female"] <- 0
+tcharge$gender[tcharge$gender == "Male"] <- 1
+tcharge$gender[tcharge$gender == "Nonbinary"] <- 2
+tcharge$gender <- as.integer(tcharge$gender)
+
+#summary statistics for data
+library(pastecs)
+stat.desc(tcharge)
+
+#export cleaned data to CSV file
+write.csv(tcharge, "CleanData.csv")
+
+#univariate analysis - histogram
+hist(tcharge$age, xlab="Age", main="Histogram of Age")
+hist(tcharge$income, xlab="Income", main="Histogram of Income")
+hist(tcharge$marital, xlab="Marital", main="Histogram of Marital")
+hist(tcharge$gender, xlab="Gender", main="Histogram of Gender")
+
+#bivariate analysis - scatterplots
+plot(x=rnorm(tcharge$age), y=rnorm(tcharge$totalcharge), ylab="Total Charges", xlab="Age")
+plot(x=rnorm(tcharge$income), y=rnorm(tcharge$totalcharge), ylab="Total Charges", xlab="Income")
+plot(x=rnorm(tcharge$marital), y=rnorm(tcharge$totalcharge), ylab="Total Charges", xlab="Marital")
+plot(x=rnorm(tcharge$gender), y=rnorm(tcharge$totalcharge), ylab="Total Charges", xlab="Gender")
+
+#multiple linear regression with ALL predictor variables
+AllPred <- lm(tcharge$totalcharge ~., data=tcharge)
+summary(AllPred)
+
+#stepwise regression
+ols_step_forward_p(AllPred, penter=.05)
+
+#reduced multiple regression model
+redPred <- lm(tcharge$totalcharge~tcharge$age, data=tcharge)
+summary(redPred)
+
+#confusion matrix
+library(caret)
+tottrain <- factor(tcharge$age)
+tottest <- factor(tcharge$age)
+confusionMatrix(tottrain, tottest)
+
+#model fit comparison
+AIC(redPred)
+AIC(AllPred)
